@@ -1,11 +1,11 @@
-const name = "jean-dupont"
+const name = "rémi-feydit"
 const promo = "B2A"
 
 const q1 = `
   SELECT *
   FROM Customer
 `
-const q1 = ``
+const q1 = `SELECT Name FROM Track WHERE Milliseconds < (SELECT Milliseconds FROM Track WHERE TrackId = 3457);`
 const q2 = ``
 const q3 = ``
 const q4 = ``
