@@ -46,9 +46,42 @@ FROM
 	) plDuree
 )
 `
-const q5 = ``
-const q6 = ``
-const q7 = ``
+const q5 = `
+SELECT nbTrackList.playlistId, nbTrackList.name
+FROM
+(SELECT pt.playlistId, p.name, COUNT(pt.trackId) as "NbTrack"
+FROM PlaylistTrack pt
+JOIN playlist p
+ON p.PlaylistId = pt.PlaylistId
+GROUP BY pt.PlaylistId, p.name) nbTrackList
+JOIN 
+(SELECT pt.playlistId, COUNT(pt.trackId) as "NbTrack"
+FROM PlaylistTrack pt
+JOIN playlist p
+ON p.playlistId = pt.playlistId
+WHERE pt.PlaylistId IN (1, 13)
+GROUP BY pt.PlaylistId) nbTrack1And13
+ON nbTrackList.nbTrack = nbTrack1And13.nbTrack
+WHERE nbTrackList.playlistId NOT IN (1, 13)
+`
+const q6 = `
+SELECT CONCAT(c.FirstName, ' ', c.LastName) as "customerName"
+FROM Customer c
+JOIN Invoice i
+ON c.CustomerId = i.CustomerId
+WHERE i.Total > (SELECT MAX(Total)
+				 FROM Invoice
+				 WHERE LOWER(billingCountry) = 'france');
+`
+const q7 = `
+SELECT *
+FROM
+(
+SELECT billingCountry, min(total) as "min", max(total) as "max", COUNT(Total) as "nbCommande"
+FROM Invoice
+GROUP BY BillingCountry
+) test
+`
 const q8 = ``
 const q9 = ``
 const q10 = ``
