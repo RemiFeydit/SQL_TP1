@@ -26,16 +26,16 @@ SELECT p.PlaylistId, p.Name
 FROM Playlist p
 JOIN PlaylistTrack pt
 ON p.PlaylistId = pt.PlaylistId
-JOIn track t 
+JOIN track t 
 ON t.TrackId = pt.TrackId
 GROUP BY p.PlaylistId, p.Name
-HAVING AVG(t.milliseconds) >
+HAVING SUM(t.milliseconds) >
 (SELECT 
 		AVG(plDuree.AvgTime)
 FROM 
 	(SELECT 
 		p.PlaylistId,
-		AVG(t.milliseconds) as "AvgTime"
+		sum(cast(t.milliseconds as numeric(12, 0))) as "AvgTime"
 	FROM 
 		Playlist p
 		JOIN PlaylistTrack pt
