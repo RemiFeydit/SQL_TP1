@@ -74,16 +74,24 @@ WHERE i.Total > (SELECT MAX(Total)
 				 WHERE LOWER(billingCountry) = 'france');
 `
 const q7 = `
-SELECT *
-FROM
-(
-SELECT billingCountry, min(total) as "min", max(total) as "max", COUNT(Total) as "nbCommande"
+SELECT billingCountry, min(total) as "min", max(total) as "max", COUNT(Total) as "nbCommande", (COUNT(Total) / (SELECT COUNT(Total)*1.0 FROM Invoice))*100 as "Moyenne commande", SUM(Total) / (SELECT SUM(Total) FROM Invoice) as "Moyenne total"
 FROM Invoice
 GROUP BY BillingCountry
-) test
 `
-const q8 = ``
-const q9 = ``
+const q8 = `
+SELECT t.TrackId, t.Name, t.AlbumId, t.MediaTypeId, t.GenreId, t.Composer, t.Milliseconds, t.Bytes, t.UnitPrice, (SELECT AVG(UnitPrice) FROM Track) as "Prix Moyen Global", (SELECT AVG(t.UnitPrice) FROM Track t JOIN MediaType mt2 ON t.MediaTypeId = mt2.MediaTypeId WHERE mt1.MediaTypeId = mt2.MediaTypeId GROUP BY t.MediaTypeId, mt2.Name) as "Moyenne du média"
+FROM track t
+JOIN MediaType mt1
+ON t.MediaTypeId = mt1.MediaTypeId
+WHERE t.UnitPrice > (SELECT AVG(UnitPrice) FROM Track)
+`
+const q9 = `
+SELECT t.TrackId, t.Name, t.AlbumId, t.MediaTypeId, t.GenreId, t.Composer, t.Milliseconds, t.Bytes, t.UnitPrice, (SELECT AVG(t.UnitPrice) FROM Track t JOIN Genre g2 ON t.GenreId = g2.GenreId WHERE g1.genreId = g2.GenreId GROUP BY t.genreId, g2.Name) as "Moyenne du média"
+FROM track t
+JOIN genre g1
+ON t.GenreId = g1.GenreId
+WHERE UnitPrice >
+`
 const q10 = ``
 const q11 = ``
 const q12 = ``
