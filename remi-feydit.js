@@ -86,18 +86,172 @@ ON t.MediaTypeId = mt1.MediaTypeId
 WHERE t.UnitPrice > (SELECT AVG(UnitPrice) FROM Track)
 `
 const q9 = `
-SELECT t.TrackId, t.Name, t.AlbumId, t.MediaTypeId, t.GenreId, t.Composer, t.Milliseconds, t.Bytes, t.UnitPrice, (SELECT AVG(t.UnitPrice) FROM Track t JOIN Genre g2 ON t.GenreId = g2.GenreId WHERE g1.genreId = g2.GenreId GROUP BY t.genreId, g2.Name) as "Moyenne du média"
+SELECT t.TrackId, t.Name, t.AlbumId, t.MediaTypeId, t.GenreId, t.Composer, t.Milliseconds, t.Bytes, t.UnitPrice, g1.Name as "NameGenre", (SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY t.UnitPrice) OVER (PARTITION BY g2.Name) AS medianMedia FROM Track t JOIN Genre g2  ON t.GenreId = g2.GenreId WHERE g1.genreId = g2.GenreId GROUP BY t.genreId, g2.Name, t.UnitPrice) as "medianMedia"
 FROM track t
 JOIN genre g1
 ON t.GenreId = g1.GenreId
-WHERE UnitPrice >
+WHERE t.UnitPrice < (SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY t.UnitPrice) OVER (PARTITION BY g2.Name) AS medianMedia FROM Track t JOIN Genre g2 ON t.GenreId = g2.GenreId WHERE g1.genreId = g2.GenreId GROUP BY t.genreId, g2.Name, t.UnitPrice)
 `
-const q10 = ``
-const q11 = ``
-const q12 = ``
-const q13 = ``
-const q14 = ``
-const q15 = ``
+const q10 = `
+SELECT pt1.playlistId, a1.artistId, 
+						(SELECT COUNT(DISTINCT a2.artistId)
+						FROM playlisttrack pt2 
+						JOIN Track t
+						ON t.TrackId = pt2.TrackId 
+						JOIN album a2
+						ON a2.albumid = t.albumId 
+						WHERE pt1.playlistId = pt2.playListId 
+						GROUP BY pt2.PlaylistId) as "nbArtistByPlayList",
+						(SELECT COUNT(DISTINCT t.trackId)
+						FROM playlisttrack pt2
+						JOIN Track t 
+						ON t.TrackId = pt2.TrackId 
+						JOIN album a3
+						ON a3.albumid = t.albumId
+						WHERE a1.ArtistId = a3.artistId
+						GROUP BY a3.artistId) as "nbChansonByArtist",
+						(SELECT AVG(t.UnitPrice) as "Nombres artistes"
+						FROM playlisttrack pt2
+						JOIN Track t 
+						ON t.TrackId = pt2.TrackId 
+						JOIN album a3
+						ON a3.albumid = t.albumId
+						WHERE a1.ArtistId = a3.artistId
+						GROUP BY a3.artistId) as "avgTrackPrince",
+						(SELECT max(nbArtist.nbArtistByPlaylist)
+						FROM
+						(
+						SELECT COUNT(DISTINCT a2.artistId) as "nbArtistByPlaylist"
+						FROM playlisttrack pt2 
+						JOIN Track t
+						ON t.TrackId = pt2.TrackId 
+						JOIN album a2
+						ON a2.albumid = t.albumId 
+						GROUP BY pt2.PlaylistId
+						) nbArtist) as "maxArtistByPlaylist" 
+FROM PlaylistTrack pt1
+JOIN Track t1
+ON t1.TrackId = pt1.TrackId 
+JOIN album a1
+ON a1.albumid = t1.albumId 
+`
+const q11 = `
+SELECT pays.Country, COUNT(pays.country) as "nbPays"
+FROM
+(
+SELECT e.Country
+FROM employee e
+UNION ALL
+SELECT c.Country
+FROM customer c
+UNION ALL
+SELECT i.BillingCountry
+FROM invoice i
+) pays
+GROUP BY pays.Country
+`
+const q12 = `
+SELECT pays.Country, COUNT(pays.country) as "nbPays",
+					ISNULL((SELECT COUNT(country)
+					FROM Employee
+					WHERE pays.country = Country
+					GROUP BY Country), 0) as "Employee",
+					(SELECT COUNT(country)
+					FROM Customer
+					WHERE pays.country = Country
+					GROUP BY Country) as "Customer", 
+					(SELECT COUNT(Billingcountry)
+					FROM Invoice
+					WHERE pays.Country = BillingCountry
+					GROUP BY BIllingCountry) as "Invoice"
+
+FROM
+(
+SELECT e.Country
+FROM employee e
+UNION ALL
+SELECT c.Country
+FROM customer c
+UNION ALL
+SELECT i.BillingCountry
+FROM invoice i
+) pays
+GROUP BY pays.Country
+`
+const q13 = `
+SELECT Invoice.InvoiceId
+            FROM Invoice
+            JOIN InvoiceLine
+              ON InvoiceLine.InvoiceId = Invoice.InvoiceId
+            JOIN Track t
+              ON T.TrackId = InvoiceLine.TrackId
+            WHERE T.Milliseconds IN (SELECT MAX(Milliseconds)
+                          FROM Track
+                          JOIN Genre
+                            ON Genre.GenreId = Track.GenreId
+                          WHERE T.GenreId = Genre.GenreId
+                          GROUP BY genre.Name)
+			GROUP BY Invoice.InvoiceId
+`
+const q14 = `
+SELECT i2.invoiceId, SUM(i2.total) / COUNT(t.trackId) as "average",
+(SELECT SUM(Milliseconds)/1000 as "temps"
+FROM Invoice i
+JOIN InvoiceLine il
+ON i.InvoiceId = il.InvoiceId
+JOIN Track t
+ON t.TrackId = il.TrackId
+WHERE i2.invoiceId = i.InvoiceId
+GROUP BY i.InvoiceId) as "totalTimeTrack",
+(SELECT (SELECT Total FROM Invoice WHERE i.InvoiceId = Invoice.InvoiceId) / (SUM(Milliseconds)/1000) as "coût par seconde"
+FROM Invoice i
+JOIN InvoiceLine il
+ON i.InvoiceId = il.InvoiceId
+JOIN Track t
+ON t.TrackId = il.TrackId
+WHERE i2.invoiceId = i.InvoiceId
+GROUP BY i.InvoiceId) "coutSeconds"
+
+FROM Invoice i2
+JOIN InvoiceLine il
+ON i2.InvoiceId = il.InvoiceId
+JOIN Track t
+ON t.TrackId = il.TrackId
+GROUP BY i2.InvoiceId
+ORDER BY i2.InvoiceId
+`
+const q15 = `
+SELECT lastName, FirstName,
+							ISNULL((SELECT COUNT(InvoiceId)
+							FROM Employee e
+							JOIN Customer c
+							ON e.EmployeeId = c.SupportRepId
+							JOIN Invoice i
+							ON c.CustomerId = i.CustomerId
+							WHERE e1.employeeId = e.employeeid
+							GROUP BY e.EmployeeId), 0) as "totalVente",
+							ISNULL((SELECT i.BillingCountry
+							FROM Employee e
+							JOIN Customer c
+							ON e.EmployeeId = c.SupportRepId
+							JOIN Invoice i
+							ON c.CustomerId = i.CustomerId
+							WHERE e1.employeeId = e.employeeid
+							GROUP BY e.EmployeeId, i.BillingCountry
+							HAVING COUNT(i.billingCountry) IN (SELECT max(nbCountry.nb)
+															  FROM 
+															  (
+															  SELECT employeeId, COUNT(i.billingCountry) as "nb"
+															  FROM Employee e
+															  JOIN Customer c
+															  ON e.EmployeeId = c.SupportRepId
+															  JOIN Invoice i
+															  ON c.CustomerId = i.CustomerId
+															  GROUP BY e.EmployeeId, i.BillingCountry
+															  ) nbCountry
+															  GROUP BY EmployeeId)), 'N/A') as "pays"
+FROM Employee e1
+`
 const q16 = ``
 const q17 = ``
 const q18 = ``

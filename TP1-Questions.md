@@ -65,7 +65,7 @@
 - 13) Les commandes qui comprennent au moins une chanson qui est la plus chanson la plus longue de son genre
 
 - 14) La liste de toutes les commandes avec:
-
+!
   - Le coût moyen par chanson
   - La durée total des chansons
   - Le coût des chansons par seconde
@@ -79,6 +79,7 @@
   - Le pourcentage de ventes (en Total) par rapport au meilleur vendeur
 
 - 16) Le nom et le prénom du 3ème meilleur vendeur
+
 - 17) La liste des playlists avec l'id, le nom, puis :
   
   - le pourcentage de chansons de la playlists qui ont été vendues au moins 2 fois
