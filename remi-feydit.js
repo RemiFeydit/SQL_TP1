@@ -151,7 +151,7 @@ FROM invoice i
 GROUP BY pays.Country
 `
 const q12 = `
-SELECT pays.Country, COUNT(pays.country) as "nbPays",
+SELECT pays.Country as "Pays", COUNT(pays.country) as "Total",
 					ISNULL((SELECT COUNT(country)
 					FROM Employee
 					WHERE pays.country = Country
@@ -191,7 +191,7 @@ SELECT Invoice.InvoiceId
                             ON Genre.GenreId = Track.GenreId
                           WHERE T.GenreId = Genre.GenreId
                           GROUP BY genre.Name)
-			GROUP BY Invoice.InvoiceId
+GROUP BY Invoice.InvoiceId;
 `
 const q14 = `
 SELECT i2.invoiceId, SUM(i2.total) / COUNT(t.trackId) as "average",
@@ -218,7 +218,7 @@ ON i2.InvoiceId = il.InvoiceId
 JOIN Track t
 ON t.TrackId = il.TrackId
 GROUP BY i2.InvoiceId
-ORDER BY i2.InvoiceId
+ORDER BY i2.InvoiceId;
 `
 const q15 = `
 SELECT lastName, FirstName,
@@ -249,20 +249,240 @@ SELECT lastName, FirstName,
 															  ON c.CustomerId = i.CustomerId
 															  GROUP BY e.EmployeeId, i.BillingCountry
 															  ) nbCountry
-															  GROUP BY EmployeeId)), 'N/A') as "pays"
-FROM Employee e1
+															  GROUP BY EmployeeId)), 'N/A') as "pays",
+							ISNULL((SELECT g.Name
+									FROM Employee e
+									JOIN Customer c
+									ON e.EmployeeId = c.SupportRepId
+									JOIN Invoice i
+									ON c.CustomerId = i.CustomerId
+									JOIN invoiceline il
+									ON i.invoiceId = il.InvoiceId
+									JOIN Track t
+									ON il.TrackId = t.TrackId
+									JOIN Genre g
+									ON t.GenreId = g.GenreId
+									WHERE e1.employeeId = e.employeeid
+									GROUP BY e.EmployeeId, g.Name
+									HAVING COUNT(t.genreId) IN (SELECT max(nbGenre.nb)
+																		FROM 
+																		(
+																		SELECT employeeId, COUNT(t.genreId) as "nb"
+																		FROM Employee e
+																		JOIN Customer c
+																		ON e.EmployeeId = c.SupportRepId
+																		JOIN Invoice i
+																		ON c.CustomerId = i.CustomerId
+																		JOIN invoiceline il
+																		ON i.invoiceId = il.InvoiceId
+																		JOIN Track t
+																		ON il.TrackId = t.TrackId
+																		GROUP BY e.EmployeeId, t.genreId
+																		) nbGenre
+																		GROUP BY EmployeeId)), 'N/A') as "mostGenre",
+							ISNULL((SELECT (COUNT(InvoiceId) / (SELECT MAX(cast(maxVente.nbVentes as decimal(3, 0)))
+							FROM
+							(
+							SELECT COUNT(InvoiceId) as "nbVentes"
+							FROM Employee e
+							JOIN Customer c
+							ON e.EmployeeId = c.SupportRepId
+							JOIN Invoice i
+							ON c.CustomerId = i.CustomerId
+							GROUP BY e.EmployeeId
+							) maxVente))*100 as '% ventes par rapport au meilleur vendeurs'
+							FROM Employee e
+							JOIN Customer c
+							ON e.EmployeeId = c.SupportRepId
+							JOIN Invoice i
+							ON c.CustomerId = i.CustomerId
+							WHERE e1.employeeId = e.employeeid
+							GROUP BY e.EmployeeId
+							HAVING COUNT(InvoiceId) != (SELECT MAX(maxVente.nbVentes)
+														FROM
+														(
+														SELECT COUNT(InvoiceId) as "nbVentes"
+														FROM Employee e
+														JOIN Customer c
+														ON e.EmployeeId = c.SupportRepId
+														JOIN Invoice i
+														ON c.CustomerId = i.CustomerId
+														GROUP BY e.EmployeeId
+														) maxVente)), 0) as "% ventes par rapport au meilleur vendeurs"
+FROM Employee e1;
 `
-const q16 = ``
-const q17 = ``
-const q18 = ``
-const q19 = ``
-const q20 = ``
-const q21 = ``
-const q22 = ``
-const q23 = ``
-const q24 = ``
-const q25 = ``
-const q26 = ``
+const q16 = `
+SELECT resultat.LastName, resultat.FirstName
+FROM
+    (
+        SELECT TOP 3 Employee.LastName, Employee.FirstName, COUNT(Employee.EmployeeId) nbrVente
+    FROM Employee
+    JOIN Customer
+        ON Employee.EmployeeId = Customer.SupportRepId
+    JOIN Invoice
+        ON Customer.CustomerId = Invoice.CustomerId
+    GROUP BY Employee.LastName, Employee.FirstName
+    ORDER BY nbrVente DESC
+    )resultat
+WHERE resultat.nbrVente = (    SELECT MIN(resultat2.nbrVente)
+                            FROM
+                            (
+                                SELECT TOP 3 Employee.LastName, Employee.FirstName, COUNT(EmployeeId) nbrVente
+                                FROM Employee
+                                JOIN Customer
+                                    ON Employee.EmployeeId = Customer.SupportRepId
+                                JOIN Invoice
+                                    ON Customer.CustomerId = Invoice.CustomerId
+                                GROUP BY Employee.LastName, Employee.FirstName
+                                ORDER BY nbrVente DESC
+							)resultat2);
+`
+const q17 = `
+SELECT playlistId, ((SELECT COUNT(t.trackId) as "jsp"
+					FROM Playlist p2
+					JOIN PlaylistTrack pt
+					ON p2.PlaylistId = pt.PlaylistId
+					JOIN Track t
+					ON pt.TrackId = t.TrackId
+					WHERE t.TrackId IN (SELECT t.TrackId
+									  FROM InvoiceLine il
+									  JOIN Track t
+									  ON il.TrackId = t.TrackId
+									  GROUP BY t.trackId
+									  HAVING COUNT(il.trackId) = 2)
+					AND p1.PlaylistId = p2.PlaylistId
+					GROUP BY p2.PlaylistId) / CAST((SELECT COUNT(pt.PlaylistId) as "Number of tracks"
+												FROM Playlist p2
+												JOIN PlaylistTrack pt
+												ON p2.PlaylistId = pt.PlaylistId
+												JOIn track t 
+												ON t.TrackId = pt.TrackId
+												WHERE p1.PlaylistId = p2.playlistId
+												GROUP BY p2.PlaylistId) as numeric(12,0)))*100 as "% de chansons dans la playlist vendus + de 2 fois"
+FROM Playlist p1;
+`
+const q18 = `
+IF EXISTS (SELECT name FROM master.dbo.sysdatabases WHERE name = N'Bddtp')
+BEGIN
+    ALTER DATABASE [Bddtp] SET OFFLINE WITH ROLLBACK IMMEDIATE;
+    ALTER DATABASE [Bddtp] SET ONLINE;
+    DROP DATABASE [Bddtp];
+END
+
+CREATE DATABASE [Bddtp];
+GO
+
+USE [Bddtp];
+GO
+
+CREATE TABLE [dbo].[User] (
+    id int IDENTITY(1,1) primary key NOT NULL,
+    username varchar(255),
+    email varchar(255),
+    superuser bit
+);
+GO
+CREATE TABLE [dbo].[Group] (
+    id int IDENTITY(1,1) primary key NOT NULL,
+    name varchar(255),
+    display_name varchar(255),
+    description varchar(255)
+);
+GO
+CREATE TABLE [dbo].[User_Group] (
+    user_id int FOREIGN KEY REFERENCES [User](id) NOT NULL,
+    group_id int FOREIGN KEY REFERENCES [Group](id) NOT NULL,
+);
+GO
+CREATE TABLE [dbo].[Role] (
+    id int IDENTITY(1,1) primary key NOT NULL,
+    name varchar(255),
+    display_name varchar(255),
+    description varchar(255)
+);
+GO
+CREATE TABLE [dbo].[Group_Role] (
+    group_id int FOREIGN KEY REFERENCES [Group](id) NOT NULL,
+    role_id int FOREIGN KEY REFERENCES [Role](id) NOT NULL,
+);
+GO
+CREATE TABLE [dbo].[User_Role] (
+    user_id int FOREIGN KEY REFERENCES [User](id) NOT NULL,
+    role_id int FOREIGN KEY REFERENCES [Role](id) NOT NULL,
+);
+GO
+CREATE TABLE [dbo].[Permission] (
+    id int IDENTITY(1,1) primary key NOT NULL,
+    name varchar(255),
+    display_name varchar(255),
+    description varchar(255)
+);
+GO
+CREATE TABLE [dbo].[Role_Permission] (
+    role_id int FOREIGN KEY REFERENCES [Role](id) NOT NULL,
+    permission_id int FOREIGN KEY REFERENCES Permission(id) NOT NULL,
+);
+GO
+`
+const q19 = `
+INSERT INTO Track (Name, MediaTypeId, GenreId, Composer, Milliseconds, UnitPrice)
+VALUES
+('Paradis', 1, 17, 'Orelsan', 195000, 0.99),
+('ASB', 1, 17, 'Vald', 227000, 0.99),
+('Au DD', 1, 17, 'PNL', 295000,0.99);
+`
+const q20 = `
+INSERT INTO Employee (LastName, FirstName, Country)
+VALUES
+('Feydit', 'Rémi', 'France'),
+('Caselles', 'Mathieu', 'France');
+`
+const q21 = `
+ALTER TABLE InvoiceLine NOCHECK CONSTRAINT FK_InvoiceLineInvoiceId;
+DELETE FROM Invoice WHERE InvoiceDate LIKE '%2010%';
+ALTER TABLE InvoiceLine CHECK CONSTRAINT FK_InvoiceLineInvoiceId;
+`
+const q22 = `
+UPDATE Invoice
+SET CustomerId = (
+    SELECT TOP 1 c.CustomerId
+	FROM Customer c
+	JOIN Invoice i
+	ON c.CustomerId = i.CustomerId
+	WHERE c.Country = 'France'
+	GROUP BY c.CustomerId
+	HAVING COUNT(InvoiceId) = (SELECT max(test.oui) as jsp
+						 FROM 
+						 (SELECT c.CustomerId, COUNT(c.CustomerId) as 'oui'
+						 FROM Customer c
+						 JOIN Invoice i
+						 ON c.CustomerId = i.CustomerId
+						 WHERE c.Country = 'France'
+						 GROUP BY c.CustomerId
+						 ) test)
+)
+WHERE BillingCountry = 'Germany' AND InvoiceDate BETWEEN '2011-01-02 00:00:00.000' AND '2014-01-01 00:00:00.000';
+`
+const q23 = `
+UPDATE Invoice
+SET Invoice.BillingCountry = Customer.Country
+FROM Invoice
+JOIN Customer
+ON Customer.CustomerId = Invoice.InvoiceId
+WHERE Invoice.BillingCountry != Customer.Country
+`
+const q24 = `
+ALTER TABLE Employee
+ADD Salary INT
+`
+const q25 = `
+UPDATE Employee
+SET Salary = (RAND(CHECKSUM(NEWID())) * 70000 + 30000);
+`
+const q26 = `
+ALTER TABLE dbo.Invoice
+DROP COLUMN BillingPostalCode;
+`
 
 
 
